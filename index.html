@@ -1,0 +1,1051 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Sen.Home — Agence Immobilière Premium Dakar</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@400;500;600;700&family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.css"/>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.9.4/leaflet.min.js"></script>
+  <!-- Supabase -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Inter', sans-serif; background: #F8F6F0; color: #2D2D2D; }
+    .font-display { font-family: 'Playfair Display', serif; }
+    .hero-bg {
+      background: linear-gradient(150deg, rgba(12,9,2,0.88) 0%, rgba(8,6,1,0.82) 100%),
+        url('https://images.unsplash.com/photo-1565402170291-8491f14678db?w=1920&q=80') center/cover no-repeat;
+      min-height: 100vh;
+    }
+    .card-hover { transition: transform 0.3s ease, box-shadow 0.3s ease; }
+    .card-hover:hover { transform: translateY(-5px); box-shadow: 0 24px 48px rgba(30,58,95,0.14); }
+    .fade-in { animation: fadeIn 0.45s ease both; }
+    @keyframes fadeIn { from { opacity:0; transform:translateY(12px); } to { opacity:1; transform:translateY(0); } }
+    .badge { display:inline-flex; align-items:center; padding:3px 10px; border-radius:20px; font-size:12px; font-weight:500; }
+    ::-webkit-scrollbar { width:5px; }
+    ::-webkit-scrollbar-thumb { background:#C9A84C; border-radius:4px; }
+    .nav-item { position:relative; }
+    .nav-item::after { content:''; position:absolute; bottom:-3px; left:0; width:0; height:2px; background:#C9A84C; transition:width 0.3s; }
+    .nav-item:hover::after { width:100%; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #C9A84C; outline-offset: 1px; }
+    table { border-collapse: collapse; }
+    tr { transition: background 0.15s; }
+    .btn-primary { background:#C9A84C; color:white; border-radius:12px; padding:10px 22px; font-weight:600; font-size:14px; transition:opacity 0.2s; cursor:pointer; border:none; }
+    .btn-primary:hover { opacity:0.88; }
+    .btn-gold { background:#C9A84C; color:white; border-radius:12px; padding:10px 22px; font-weight:600; font-size:14px; transition:opacity 0.2s; cursor:pointer; border:none; }
+    .btn-gold:hover { opacity:0.88; }
+    .btn-green { background:#25D366; color:white; border-radius:10px; padding:8px 14px; font-size:12px; font-weight:600; transition:opacity 0.2s; cursor:pointer; border:none; }
+    .btn-green:hover { opacity:0.88; }
+
+    /* Spinner */
+    .spinner { width:36px; height:36px; border:3px solid rgba(201,168,76,0.3); border-top-color:#C9A84C; border-radius:50%; animation:spin 0.8s linear infinite; margin:20px auto 0; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* DB status banner */
+    .db-banner { display:flex; align-items:center; gap:8px; font-size:12px; font-weight:600; padding:6px 14px; border-radius:20px; }
+    .db-live { background:#D1FAE5; color:#065F46; }
+    .db-demo { background:#FEF3C7; color:#92400E; }
+
+    /* Leaflet */
+    .leaflet-container { font-family: 'Inter', sans-serif; }
+    .map-pin { background:#C9A84C; color:white; padding:4px 9px; border-radius:20px; font-size:11px; font-weight:700; white-space:nowrap; box-shadow:0 2px 10px rgba(201,168,76,0.45); border:2px solid white; cursor:pointer; transition:transform 0.15s, background 0.15s; }
+    .map-pin:hover { background:#C9A84C; transform:scale(1.12); }
+    .map-pin.loue { background:#9CA3AF; }
+    .leaflet-popup-content-wrapper { border-radius:16px !important; box-shadow:0 8px 32px rgba(0,0,0,0.18) !important; padding:0 !important; overflow:hidden; }
+    .leaflet-popup-content { margin:0 !important; width:220px !important; }
+    .leaflet-popup-tip-container { display:none; }
+  </style>
+</head>
+<body>
+<div id="root"></div>
+
+<script type="text/babel">
+const { useState, useEffect, useRef } = React;
+
+/* ─────────────────────────────────────────
+   SUPABASE CLIENT
+───────────────────────────────────────── */
+const SUPABASE_URL  = 'https://usnfmbnfailkhnpsmnqg.supabase.co';
+const SUPABASE_KEY  = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVzbmZtYm5mYWlsa2hucHNtbnFnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUzMDI5NjksImV4cCI6MjA5MDg3ODk2OX0.0X-Po7I1SmuskFDX9cC0jh93bpIiu9eq3TCYq8JDBnY';
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+/* ─────────────────────────────────────────
+   STATIC FALLBACK DATA (si Supabase vide)
+───────────────────────────────────────── */
+const ZONES = ['Toutes les zones','Almadies','Point E','Plateau','Mermoz','Sacré-Cœur','Ngor','Ouakam','Fann Résidence','Liberté 6'];
+const BUDGETS = [
+  { label:'Tous les budgets', min:0, max:Infinity },
+  { label:'< 200 000 FCFA',   min:0, max:200000 },
+  { label:'200 000 – 400 000 FCFA', min:200000, max:400000 },
+  { label:'400 000 – 700 000 FCFA', min:400000, max:700000 },
+  { label:'700 000 – 1 000 000 FCFA', min:700000, max:1000000 },
+  { label:'> 1 000 000 FCFA', min:1000000, max:Infinity },
+];
+const ALL_AMENITIES = ['Climatisation','Meublé','WiFi','Parking','Gardiennage','Cuisine équipée','Piscine','Générateur','Ascenseur','Terrasse','Sécurité 24h/7j','Vue mer'];
+const SLOTS = ['2026-04-08','2026-04-09','2026-04-10','2026-04-14','2026-04-15','2026-04-16','2026-04-17'];
+
+const STATIC_APTS = [
+  { id:1, title:'Studio Premium Almadies', zone:'Almadies', price:350000, type:'Studio', surface:45, bedrooms:1, bathrooms:1,
+    description:'Magnifique studio entièrement meublé dans le quartier prisé des Almadies. À deux pas de la corniche.',
+    images:['https://images.unsplash.com/photo-1502672260266-1c1ef2d93688?w=800&q=80','https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80','https://images.unsplash.com/photo-1484154218962-a197022b5858?w=800&q=80'],
+    tour:'https://my.matterport.com/show/?m=SxQL3iGyoDo', amenities:['Climatisation','Meublé','WiFi','Parking','Gardiennage'],
+    lat:14.7517, lng:-17.5263, available:true, featured:true, views:284 },
+  { id:2, title:'Appartement F3 Point E', zone:'Point E', price:550000, type:'F3', surface:90, bedrooms:2, bathrooms:2,
+    description:'Spacieux F3 dans un immeuble moderne. Cuisine équipée, deux chambres avec dressings.',
+    images:['https://images.unsplash.com/photo-1493809842364-78817add7ffb?w=800&q=80','https://images.unsplash.com/photo-1556909172-54557c7e4fb7?w=800&q=80','https://images.unsplash.com/photo-1555041469-a586c61ea9bc?w=800&q=80'],
+    tour:'', amenities:['Climatisation','Meublé','WiFi','Cuisine équipée','Gardiennage','Parking'],
+    lat:14.6978, lng:-17.4566, available:true, featured:true, views:412 },
+  { id:3, title:'Villa Duplex Ngor', zone:'Ngor', price:1200000, type:'Duplex', surface:200, bedrooms:4, bathrooms:3,
+    description:'Sublime villa duplex à Ngor avec vue panoramique sur l\'Atlantique. Piscine privée, jardin paysager.',
+    images:['https://images.unsplash.com/photo-1613977257363-707ba9348227?w=800&q=80','https://images.unsplash.com/photo-1512917774080-9991f1c4c750?w=800&q=80','https://images.unsplash.com/photo-1580587771525-78b9dba3b914?w=800&q=80'],
+    tour:'https://my.matterport.com/show/?m=SxQL3iGyoDo', amenities:['Climatisation','Meublé','WiFi','Piscine','Gardiennage','Parking','Cuisine équipée','Terrasse','Vue mer','Générateur'],
+    lat:14.7497, lng:-17.5099, available:true, featured:true, views:631 },
+  { id:4, title:'Appartement F2 Mermoz', zone:'Mermoz', price:280000, type:'F2', surface:60, bedrooms:1, bathrooms:1,
+    description:'Charmant F2 rénové dans résidence sécurisée. Calme et lumineux.',
+    images:['https://images.unsplash.com/photo-1522708323590-d24dbb6b0267?w=800&q=80','https://images.unsplash.com/photo-1560185007-c5ca9d2c014d?w=800&q=80'],
+    tour:'', amenities:['Climatisation','Gardiennage','WiFi'], lat:14.7078, lng:-17.4868, available:true, featured:false, views:156 },
+  { id:5, title:'Penthouse Sacré-Cœur', zone:'Sacré-Cœur', price:850000, type:'Penthouse', surface:150, bedrooms:3, bathrooms:2,
+    description:'Penthouse avec terrasse panoramique de 50m². Vue à 360° sur Dakar.',
+    images:['https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=800&q=80','https://images.unsplash.com/photo-1600607687939-ce8a6c25118c?w=800&q=80'],
+    tour:'https://my.matterport.com/show/?m=SxQL3iGyoDo', amenities:['Climatisation','Meublé','WiFi','Terrasse','Ascenseur','Sécurité 24h/7j','Parking','Vue mer'],
+    lat:14.7271, lng:-17.4607, available:false, featured:true, views:847 },
+  { id:6, title:'Studio Ouakam Corniche', zone:'Ouakam', price:180000, type:'Studio', surface:35, bedrooms:1, bathrooms:1,
+    description:'Studio cosy à Ouakam, parfait pour étudiant ou jeune professionnel.',
+    images:['https://images.unsplash.com/photo-1536376072261-38c75010e6c9?w=800&q=80'],
+    tour:'', amenities:['WiFi','Gardiennage'], lat:14.7449, lng:-17.5100, available:true, featured:false, views:98 },
+  { id:7, title:'Appartement F4 Fann Résidence', zone:'Fann Résidence', price:720000, type:'F4', surface:130, bedrooms:3, bathrooms:2,
+    description:'Grand appartement familial dans la prestigieuse Fann Résidence.',
+    images:['https://images.unsplash.com/photo-1600210492493-0946911123ea?w=800&q=80'],
+    tour:'', amenities:['Climatisation','Meublé','WiFi','Gardiennage','Parking','Cuisine équipée','Générateur'],
+    lat:14.6980, lng:-17.4547, available:true, featured:false, views:203 }
+];
+
+const STATIC_REQUESTS = [
+  { id:1, apt_id:1, apt_title:'Studio Premium Almadies', name:'Mamadou Diallo', phone:'+221 77 123 45 67', budget:'200 000 – 400 000 FCFA', date:'2026-04-10', profession:'Ingénieur', status:'new', created:'2026-04-03' },
+  { id:2, apt_id:3, apt_title:'Villa Duplex Ngor', name:'Sophie Martin', phone:'+221 76 987 65 43', budget:'> 1 000 000 FCFA', date:'2026-04-08', profession:'DG – Expatriée', status:'contacted', created:'2026-04-02' },
+  { id:3, apt_id:2, apt_title:'Appartement F3 Point E', name:'Ibrahima Ndiaye', phone:'+221 70 456 78 90', budget:'400 000 – 700 000 FCFA', date:'2026-04-12', profession:'Médecin', status:'new', created:'2026-04-04' },
+];
+
+/* ─────────────────────────────────────────
+   HELPERS
+───────────────────────────────────────── */
+const fmt = (n) => new Intl.NumberFormat('fr-FR').format(n) + ' FCFA';
+const fmtDate = (d) => { try { return new Date(d).toLocaleDateString('fr-FR',{weekday:'long',day:'numeric',month:'long'}); } catch { return d; } };
+
+const transformApt = (a) => ({
+  id: a.id,
+  title: a.title,
+  zone: a.zones?.name || a.zone || '',
+  price: a.price_monthly || a.price || 0,
+  type: a.type || '',
+  surface: a.surface_m2 || a.surface || 0,
+  bedrooms: a.bedrooms || 1,
+  bathrooms: a.bathrooms || 1,
+  description: a.description || '',
+  images: a.apartment_images
+    ? [...a.apartment_images].sort((x,y)=>x.display_order-y.display_order).map(i=>i.url).filter(Boolean)
+    : (a.images || []),
+  tour: a.virtual_tour_url || a.tour || '',
+  amenities: a.apartment_amenities ? a.apartment_amenities.map(am=>am.amenity) : (a.amenities || []),
+  lat: a.latitude ? parseFloat(a.latitude) : (a.lat || null),
+  lng: a.longitude ? parseFloat(a.longitude) : (a.lng || null),
+  available: a.available,
+  featured: a.featured,
+  views: a.views || 0,
+});
+
+const transformReq = (r) => ({
+  id: r.id,
+  apt_id: r.apartment_id || r.apt_id,
+  apt_title: r.apartments?.title || r.apt_title || '',
+  name: r.full_name || r.name || '',
+  phone: r.phone || '',
+  budget: r.budget_label || r.budget || '',
+  date: r.visit_date || r.date || '',
+  profession: r.profession || '',
+  status: r.status || 'new',
+  created: (r.created_at || r.created || '').slice(0,10),
+});
+
+/* ─────────────────────────────────────────
+   ICONS
+───────────────────────────────────────── */
+const I = ({ n, s=18, c='' }) => {
+  const paths = {
+    search:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>,
+    location:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>,
+    bed:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M2 4v16"/><path d="M2 8h18a2 2 0 0 1 2 2v10"/><path d="M2 17h20"/><path d="M6 8v9"/></svg>,
+    bath:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M9 6 6.5 3.5a1.5 1.5 0 0 0-2 0C4 4 4 5 4 5v13a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2H9z"/><line x1="2" y1="12" x2="22" y2="12"/></svg>,
+    expand:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><polyline points="15 3 21 3 21 9"/><polyline points="9 21 3 21 3 15"/><line x1="21" y1="3" x2="14" y2="10"/><line x1="3" y1="21" x2="10" y2="14"/></svg>,
+    eye:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>,
+    heart:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>,
+    phone:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 13a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.77 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l.91-.91a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 17z"/></svg>,
+    calendar:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><rect x="3" y="4" width="18" height="18" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>,
+    check:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><polyline points="20 6 9 17 4 12"/></svg>,
+    grid:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><rect x="3" y="3" width="7" height="7"/><rect x="14" y="3" width="7" height="7"/><rect x="14" y="14" width="7" height="7"/><rect x="3" y="14" width="7" height="7"/></svg>,
+    list:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>,
+    map:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>,
+    left:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>,
+    right:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>,
+    close:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>,
+    tour:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M1 6v16l7-4 8 4 7-4V2l-7 4-8-4-7 4z"/><path d="M8 2v16"/><path d="M16 6v16"/></svg>,
+    building:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><rect x="4" y="2" width="16" height="20" rx="2"/><path d="M9 22v-4h6v4"/><path d="M8 6h.01M16 6h.01M12 6h.01M12 10h.01M12 14h.01M16 10h.01M16 14h.01M8 10h.01M8 14h.01"/></svg>,
+    plus:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>,
+    edit:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>,
+    trash:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>,
+    logout:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>,
+    menu:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="18" x2="21" y2="18"/></svg>,
+    refresh:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>,
+    db:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>,
+    wa:<svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor" className={c}><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51-.173-.008-.371-.01-.57-.01-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 01-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 01-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 012.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0012.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 005.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 00-3.48-8.413z"/></svg>,
+    down:<svg width={s} height={s} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" className={c}><polyline points="6 9 12 15 18 9"/></svg>,
+  };
+  return paths[n] || null;
+};
+
+/* ─────────────────────────────────────────
+   NAVBAR
+───────────────────────────────────────── */
+const Navbar = ({ page, go, dbLive }) => {
+  const [open, setOpen] = useState(false);
+  const isAdmin = page.startsWith('admin');
+  if (isAdmin) return (
+    <nav style={{background:'#0A1628'}} className="px-6 py-4 flex items-center justify-between text-white">
+      <div className="flex items-center gap-3">
+        <span style={{color:'#1E3A5F'}} className="font-display text-xl font-bold">Sen.Home</span>
+        <span className="text-white/30 text-sm">| Admin</span>
+      </div>
+      <div className="flex items-center gap-2">
+        <span className={`db-banner ${dbLive?'db-live':'db-demo'}`}>
+          <I n="db" s={12}/> {dbLive ? 'Supabase connecté' : 'Données démo'}
+        </span>
+        <div className="flex gap-5 text-sm ml-4">
+          {[['admin-dashboard','Tableau de bord'],['admin-properties','Biens'],['admin-requests','Demandes']].map(([p,l])=>(
+            <button key={p} onClick={()=>go(p)} className={`transition-colors ${page===p?'text-yellow-400':'text-white/60 hover:text-white'}`}>{l}</button>
+          ))}
+          <button onClick={()=>go('home')} className="text-white/30 hover:text-white flex items-center gap-1 transition-colors"><I n="logout" s={13}/>Quitter</button>
+        </div>
+      </div>
+    </nav>
+  );
+  return (
+    <nav className="fixed top-0 inset-x-0 z-50 bg-white/95 backdrop-blur shadow-sm">
+      <div className="max-w-6xl mx-auto px-4 py-3 flex items-center justify-between">
+        <button onClick={()=>go('home')} className="font-display text-2xl font-bold" style={{color:'#1E3A5F'}}>
+          Sen<span style={{color:'#C9A84C'}}>.</span>Home
+        </button>
+        <div className="hidden md:flex items-center gap-8">
+          <button onClick={()=>go('properties')} className="nav-item text-gray-600 text-sm font-medium">Nos Biens</button>
+          <button className="nav-item text-gray-600 text-sm font-medium">À propos</button>
+          <button className="nav-item text-gray-600 text-sm font-medium">Contact</button>
+          <button onClick={()=>go('admin-login')} className="btn-primary text-sm px-5 py-2 rounded-full">Espace Admin</button>
+        </div>
+        <button className="md:hidden" onClick={()=>setOpen(!open)}><I n="menu" s={24}/></button>
+      </div>
+      {open && (
+        <div className="md:hidden bg-white border-t px-4 py-4 space-y-3 fade-in">
+          <button onClick={()=>{go('properties');setOpen(false);}} className="block w-full text-left text-gray-600 py-2">Nos Biens</button>
+          <button className="block w-full text-left text-gray-600 py-2">À propos</button>
+          <button className="block w-full text-left text-gray-600 py-2">Contact</button>
+          <button onClick={()=>{go('admin-login');setOpen(false);}} className="btn-primary w-full text-center block">Espace Admin</button>
+        </div>
+      )}
+    </nav>
+  );
+};
+
+/* ─────────────────────────────────────────
+   PROPERTY CARD
+───────────────────────────────────────── */
+const AptCard = ({ apt, onClick }) => (
+  <div onClick={()=>onClick(apt)} className="card-hover bg-white rounded-2xl overflow-hidden shadow-md cursor-pointer">
+    <div className="relative">
+      <img src={apt.images[0]||'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=800&q=80'} alt={apt.title} className="w-full h-52 object-cover" onError={e=>e.target.src='https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&q=60'}/>
+      <div className="absolute top-3 left-3">
+        <span className={`badge text-white text-xs ${apt.available?'bg-emerald-500':'bg-red-400'}`}>● {apt.available?'Disponible':'Loué'}</span>
+      </div>
+      {apt.tour && <div className="absolute top-3 right-3"><span className="badge bg-white/90 text-blue-800 text-xs gap-1"><I n="tour" s={11}/>Visite 3D</span></div>}
+      <div className="absolute bottom-3 right-3 bg-black/50 text-white text-xs px-2 py-1 rounded-full flex items-center gap-1"><I n="eye" s={11}/>{apt.views}</div>
+    </div>
+    <div className="p-4">
+      <div className="flex justify-between items-start mb-1">
+        <h3 className="font-semibold text-gray-800 text-sm leading-snug">{apt.title}</h3>
+        <button onClick={e=>{e.stopPropagation();}} className="text-gray-200 hover:text-red-400 transition-colors ml-2"><I n="heart" s={15}/></button>
+      </div>
+      <div className="flex items-center gap-1 text-gray-400 text-xs mb-3"><I n="location" s={12}/><span>{apt.zone}</span></div>
+      <div className="flex items-center gap-3 text-gray-400 text-xs mb-3">
+        <span className="flex items-center gap-1"><I n="bed" s={12}/>{apt.bedrooms} ch.</span>
+        <span className="flex items-center gap-1"><I n="bath" s={12}/>{apt.bathrooms} sdb</span>
+        <span className="flex items-center gap-1"><I n="expand" s={12}/>{apt.surface}m²</span>
+      </div>
+      <div className="flex items-center justify-between">
+        <div><span className="font-bold text-base" style={{color:'#1E3A5F'}}>{fmt(apt.price)}</span><span className="text-gray-400 text-xs">/mois</span></div>
+        <span className="text-xs px-2 py-1 rounded-full" style={{background:'#FEF9E7',color:'#1E3A5F'}}>{apt.type}</span>
+      </div>
+    </div>
+  </div>
+);
+
+/* ─────────────────────────────────────────
+   MAP VIEW
+───────────────────────────────────────── */
+const MapView = ({ apts, onSelect }) => {
+  const containerRef = useRef(null);
+  const mapRef = useRef(null);
+  const markersRef = useRef([]);
+  const [popup, setPopup] = useState(null);
+  useEffect(() => {
+    if (!containerRef.current || mapRef.current) return;
+    mapRef.current = L.map(containerRef.current, {zoomControl:true}).setView([14.720,-17.490],13);
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',{attribution:'© OpenStreetMap',maxZoom:19}).addTo(mapRef.current);
+    return () => { if (mapRef.current){mapRef.current.remove();mapRef.current=null;} };
+  }, []);
+  useEffect(() => {
+    if (!mapRef.current) return;
+    markersRef.current.forEach(m=>m.remove()); markersRef.current=[];
+    const FALLBACK_COORDS=[[14.7517,-17.5263],[14.6978,-17.4566],[14.7497,-17.5099],[14.7078,-17.4868],[14.7271,-17.4607],[14.7449,-17.5100],[14.6980,-17.4547]];
+    apts.forEach((apt,idx) => {
+      const mlat = apt.lat || FALLBACK_COORDS[idx % FALLBACK_COORDS.length][0];
+      const mlng = apt.lng || FALLBACK_COORDS[idx % FALLBACK_COORDS.length][1];
+      const icon = L.divIcon({html:`<div class="map-pin ${apt.available?'':'loue'}">${Math.round(apt.price/1000)}k</div>`,className:'',iconAnchor:[28,18]});
+      const m = L.marker([mlat,mlng],{icon}).addTo(mapRef.current);
+      m.on('click',()=>setPopup(apt));
+      markersRef.current.push(m);
+    });
+  }, [apts]);
+  return (
+    <div className="relative rounded-2xl overflow-hidden shadow-md" style={{height:'540px'}}>
+      <div ref={containerRef} style={{height:'100%',width:'100%'}}></div>
+      <div className="absolute top-3 left-3 z-50 bg-white rounded-xl px-3 py-2 shadow-md flex items-center gap-3 text-xs">
+        <span className="flex items-center gap-1.5"><span style={{background:'#C9A84C',borderRadius:'20px',padding:'2px 8px',color:'white',fontWeight:700}}>350k</span>Disponible</span>
+        <span className="flex items-center gap-1.5"><span style={{background:'#9CA3AF',borderRadius:'20px',padding:'2px 8px',color:'white',fontWeight:700}}>850k</span>Loué</span>
+      </div>
+      {popup && (
+        <div className="absolute bottom-4 right-4 bg-white rounded-2xl shadow-xl overflow-hidden fade-in" style={{width:'230px',zIndex:2000}}>
+          <div className="relative">
+            <img src={popup.images[0]} alt={popup.title} style={{width:'100%',height:'110px',objectFit:'cover'}}/>
+            <button onClick={()=>setPopup(null)} className="absolute top-2 right-2 bg-white/90 hover:bg-white rounded-full w-6 h-6 flex items-center justify-center shadow"><I n="close" s={13}/></button>
+            <span className={`absolute bottom-2 left-2 badge text-white text-xs ${popup.available?'bg-emerald-500':'bg-red-400'}`}>{popup.available?'● Disponible':'● Loué'}</span>
+          </div>
+          <div className="p-3">
+            <p className="font-semibold text-gray-800 text-sm leading-snug">{popup.title}</p>
+            <p className="text-xs text-gray-400 mt-0.5 flex items-center gap-1"><I n="location" s={11}/>{popup.zone}</p>
+            <p className="font-bold mt-1 text-sm" style={{color:'#1E3A5F'}}>{fmt(popup.price)}<span className="text-gray-400 font-normal text-xs">/mois</span></p>
+            <div className="flex gap-2 mt-2.5">
+              <button onClick={()=>setPopup(null)} className="flex-1 border border-gray-200 text-gray-400 text-xs py-1.5 rounded-lg">Fermer</button>
+              <button onClick={()=>onSelect(popup)} className="btn-gold flex-1 text-xs py-1.5 rounded-lg">Voir →</button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   HOME PAGE
+───────────────────────────────────────── */
+const HomePage = ({ go, pick, apartments }) => {
+  const featured = apartments.filter(a=>a.featured).slice(0,3);
+  return (
+    <div>
+      <div className="hero-bg flex items-center justify-center relative">
+        <div className="text-center px-4 py-24 fade-in max-w-3xl mx-auto">
+          <div className="flex justify-center mb-6"><div style={{width:'220px',height:'211px',filter:'drop-shadow(0 4px 12px rgba(201,168,76,0.4))'}}><svg width="100%" height="100%" fill="white" id="Layer_1" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 143.86 137.87"><g><path d="M81.97,12.87c.83,1.34,.84,2.7,.09,4.26l-1.3-.94-2.72,4.74c.9-.21,1.6-.28,2.22-.54,2.32-.96,3.45-3.17,2.9-5.62-.29-1.29,0-2.38,.94-3.34-.26,1.3-.38,2.57,.38,3.74,1.36-1.26,1.52-2.82,.45-4.3-.99-1.38-.97-2.59,.2-3.99l1.36,1.97,.81-.45c.83,1.29,.73,2.51-.05,3.8l2.37-.74c.48,1.92-.53,3.98-2.4,4.28-1.96,.31-2.21,1.59-2.53,3.11,2.83,.26,4.37-1.35,5.41-3.84,.36,1.6-.9,3.88-2.52,4.59-.9,.39-1.91,.53-2.86,.83-.54,.17-1.15,.33-1.56,.69-1.32,1.17-2.83,1.85-4.55,2.18-1.92,.37-2.49,1.09-2.73,3.04-.27,2.24,.43,4.34,.84,6.48,.2,1.03,.37,2.06,.56,3.09l.27-.04c-.2-1.62-.29-3.26-.64-4.84-.35-1.6,.16-2.73,1.3-3.76,2.31-2.08,4.87-2.93,7.91-1.85,.51,.18,1.05,.31,1.59,.38,1.7,.23,2.66-.42,3.06-2.06,.05-.2-.04-.48-.17-.65-1-1.37-.91-2.75,.34-4,1.01,.76,1.39,1.78,1.2,3.01,.87-.16,1.7-.3,2.5-.48,.79-.18,1.03-.66,.46-1.22-.52-.51-1.23-.91-1.92-1.12-1.58-.48-2.28-1.11-2.41-2.61,.36,.42,.61,.82,.96,1.09,.36,.28,.81,.43,1.33,.69-.03-1.37-.21-2.42-1.17-3.31-1.12-1.04-1.81-2.35-1.48-3.99l-.3,.07c-.17-.54-.49-1.08-.49-1.63,0-1.76,1.16-3.03,3.04-3.37v2.46l.93-.16c.64,1.63,.01,2.93-2.33,4.6l1.71,1.96,.34-.06,.86-3.79,.33,1.09c.83-1.41,2.04-1.99,3.59-2.19l-.11,1.87,2.48,.15c-.37,1.86-1.82,2.8-3.86,2.7-.73-.03-1.47,.08-2.2,.12l-.02,.43c.4,.03,.81,.1,1.21,.09,.43,0,.86-.08,1.51-.15-.91,1.09-1.94,.82-2.92,.81-.18,.88,.16,1.5,.75,2,.76,.65,1.55,1.27,2.43,1.99,.52-.23,.43-.85,.37-1.45-.15-1.62,.21-3.01,1.71-3.91,.1-.06,.21-.09,.46-.06-.93,1.21-1.83,2.41-1.32,4.14,1.04-.76,1.38-1.77,1.47-2.92,.15-1.98,1.13-3.2,3.13-3.68l-.25,2.99h2.02l-.05,.74,3,.32c-.57,1.79-2.21,2.6-3.97,2.35-1.9-.27-3.56,.42-4.96,1.69-.35,.32-.6,.76-.89,1.14-.83,1.04-1.84,1.78-3.17,2.06-.84,.18-1.62,.47-1.8,1.47,1.46,1.03,3.39,1.53,4.56,1.15-.42-2.04,.06-3.74,2.05-4.77,.65,.98,.66,1.84-.04,4.06,.66-.59,1.24-1.01,1.66-1.54,.18-.22,.12-.71,.04-1.04-.41-1.74,.29-3.28,2.06-4.08l.55,3.12c.31-.34,.68-.59,.82-.94,.7-1.71,1.72-2.42,3.62-2.42,.27,1.51-.74,2.93-2.4,3.39-.68,.19-1.37,.36-2.02,.61-.3,.11-.55,.39-.75,.79l3.27-.35,.09,.23c-.62,.21-1.22,.49-1.85,.63-1.44,.32-2.63,.98-3.4,2.56,.75-.07,1.54-.01,2.25-.23,1.99-.62,3.27-2.24,4.69-3.62,.25-.25,.19-.85,.23-1.29,.15-1.89,1.33-3.11,3.51-3.34l-.48,2.72,1.81,.5-.97,1.42,1.3,.9-.97,.48,2.03,1.43c-1.42,1.38-2.88,1.36-5.22-.03l.65-.58-1.67-1.02-1.58,1.53c2.55-.15,3.97,1.04,4.71,3.17-1.74,.6-3.41-.06-4.31-1.67-.54-.97-.73-1-1.66-.26,.47,.31,1,.56,1.39,.96,.39,.4,.64,.94,.96,1.43-1.39,.57-2.76,.29-3.53-.81-.42-.61-.83-.5-1.43-.48-1.91,.08-3.7,.51-5.48,1.23-1.27,.51-2.68,.25-3.97-.25-1.11-.43-2.15-.44-3.24,.16-1.42,.79-2.97,.75-4.52,.46-2.8-.53-4.67,.97-4.77,3.79-.12,3.69,1.64,6.19,5.3,7.32,3.95,1.21,7.62,2.97,10.93,5.42,8.29,6.14,13.47,14.3,14.81,24.53,1.94,14.74-3.48,26.46-15.43,35.21-.18,.13-.37,.23-.74,.46,0-.47,0-.8,0-1.13,0-9.12-.02-18.23,.01-27.35,0-.8-.24-1.1-1.02-1.27-3.05-.66-6.08-1.39-9.26-2.13-.02,.46-.06,.83-.06,1.19,0,11.34,0,22.68,.05,34.02,0,1.1-.32,1.54-1.37,1.7-1.83,.29-3.65,.67-5.59,1.04v-41.81l4.61,1.02v-17.31c-.49,.22-.92,.41-1.34,.61-4.25,2-8.5,4.01-12.75,6-.44,.21-.71,.41-.71,.98,.03,4.45,.02,8.89,.02,13.34,0,.15,.04,.3,.07,.55l4.61-1.47v38.08c-2.34-.43-4.63-.86-6.99-1.29v-32.17c-2.57,.83-5.01,1.62-7.45,2.43-.91,.3-2.12,.42-2.6,1.06-.46,.6-.16,1.79-.16,2.72,0,6.76,.02,13.53,.03,20.29,0,.25,0,.5,0,.87-.25-.11-.43-.15-.57-.25-11.63-8.36-17.36-19.69-15.8-33.95,1.61-14.73,9.84-24.89,23.54-30.55,1.95-.8,3.37-2,3.88-4.07,.42-1.74-.33-3.42-2-4.03-2.52-.91-4.65-2.32-6.46-4.26-.57-.62-1.16-.7-1.87-.25-.35,.22-.76,.34-1.14,.52-2.02,.98-4.06,1.25-6.27,.58-.83-.25-1.85-.12-2.73,.07-.88,.19-1.52,.75-1.91,1.71-.71,1.78-2.25,2.43-4.68,2l1.71-2.72c-1.06-.4-2.23-.89-3.43-1.27-.23-.07-.62,.17-.86,.37-1.42,1.19-3.22,1.3-4.74,.19,.72-1.22,1.78-2.07,3.18-1.96,1.27,.11,2.5,.64,3.68,.97l-1.06-2.26c1.88-.49,3.5,.26,4.18,2,.36,.93,.85,1,1.6,.62,.49-.24,.94-.57,1.45-.77,.85-.32,1.73-.57,2.65-.87-1.08-1.49-2.55-1.11-4.14-.59,1.1-1.29,2.89-1.62,4.21-.89,.36,.2,.7,.46,1.04,.7,1.8,1.26,4.16,1.01,5.88-.74-1.04-.27-1.98-.54-2.94-.74-1.83-.38-3.67-.69-5.49-1.1-1-.22-1.94-.19-2.78,.38-1.6,1.08-3.43,1.03-5.21,1.05-1.28,.02-2.17-.81-2.9-1.81,1.3-1.02,3.16-.96,4.4,.09,1.05,.89,1.22,.91,2.38,.15,.32-.21,.62-.44,1.06-.75-1.7-.65-3.14-1.75-4.99-1.06-.23,.09-.51,.06-.77,.07-1.14,.03-2.29,.05-3.43,.09-1.59,.05-2.9-.79-3.47-2.23,1.76-.89,3.2-.68,4.67,.66,.91,.83,2.22,.96,3.34,.31-.99-.92-1.94-1.71-3.5-1.57-1.22,.11-2.14-.71-2.71-2.01l2.05-.4c-.76-1.34-.79-2.69-.16-4.06,1.34,.48,2.45,1.77,2.25,3.17-.33,2.26,1.05,3.17,2.65,4.04,.39,.21,.8,.39,1.32,.65-.07-.87-.38-1.34-1.11-1.67-1.86-.83-2.74-2.7-2.22-4.74l2.14,.93,1.39-2.73c1.39,1.25,1.63,3.11,.73,4.51-.97,1.51-.42,3.42,1.23,4.24,.37,.18,.77,.28,1.43,.51-1.06-1.2-1.26-2.37-.98-3.73,2.04,.62,2.86,1.99,2.61,4.04l2.03,.33c-.6-1.36-1.13-2.65-1.74-3.9-.12-.25-.55-.38-.87-.5-1.71-.62-2.55-1.75-2.6-3.7l1.94,.36c-.36-1.26-.38-2.47,.42-3.64,1.16,.73,1.87,1.69,2.06,3.13l1.35-1.14c.44,1.95,.93,3.71,1.18,5.5,.08,.6-.46,1.29-.8,2.11,.76,.92,1.8,1.72,3.16,2.04,1.84,.43,3.68,.84,5.53,1.26,.3-1.22,.2-1.4-1.12-1.71-2.02-.49-3.27-2.08-3.16-4.07,2.13-.09,3.61,.84,4.45,3,.92-3.07-1.45-4.49-2.82-6.34l.2-.17,2.35,1.8c.4-.79,.74-1.56,1.16-2.29,.27-.48,.62-.45,.98,0,.95,1.18,1.03,3.11,.24,4.45-.31,.53-.42,1.17-.65,1.86l2.98-1.55c.37,2.27-.3,3.31-2.53,4.28,0,2.54,3.61,4,7.34,4.59-.02-.13-.02-.25-.04-.36-.37-1.62-.82-3.23-1.07-4.87-.13-.85-.4-1.46-1.11-1.9-.19-.12-.36-.26-.55-.39-1.66-1.17-2.51-2.78-2.66-4.81-.1-1.46-.84-2.09-2.32-2.07-.32,0-.64,.06-.96,.11-.35,.05-.71,.22-1.04,.17-2.04-.27-4.1-.48-6.1-.92-.95-.21-1.49-1.15-1.83-2.29h2.97l.27-1.53c1.27,.3,2.1,1.19,2.23,2.38,.17,1.45,.47,1.68,1.93,1.47,.22-.03,.43-.11,.88-.22-2.13-1.08-3.04-2.67-2.64-4.98,2.3,.7,3.39,2.21,3.33,4.56l2.82,.15-1.98-1.56c1.62,.02,3.11,1.1,3.56,2.53,.21,.67,.32,1.38,.48,2.07,.36,1.6,1.13,2.46,2.8,3.09,.23-1.63,.61-3.2,.08-4.86-.4-1.24-1.07-1.95-2.42-2.11-2.03-.24-3.1-1.28-3.51-3.26,2.28-.31,3.95,.45,4.85,2.75l.21-.18c-.06-.77,.03-1.59-.21-2.29-.24-.69-.92-.95-1.73-.92-2.42,.07-4.09-1.31-4.62-3.83,1.37-.3,2.57,.09,3.78,.82l.32-2.4,1.67,.98,1.58-3.11,.74,1.09,2.75-1.56,.33,.27-.58,2.71h1.35c-.09,1.72-1.12,3.07-2.63,3.49-1.38,.38-1.63,.69-1.74,2.14-.02,.24,0,.48,0,.77l2.05-1.63c.85,1.43,.42,2.61-1.35,3.97l1.16,2.37c.66-1.1,1.31-2,1.76-2.98,.17-.38,0-1-.18-1.45-.7-1.78-.2-3.59,1.34-4.69,1.27,1.33,1.47,3.24,.59,4.77-.47,.81-.79,1.71-1.24,2.7,2.28-.59,3.87-2.97,3.44-4.98-.08-.37-.41-.7-.67-1.02-1.17-1.45-1.16-2.98,.19-4.62l1.81,2.44,1.97-1.05c.73,1.54,.12,3.44-1.41,4.68-.9,.73-.96,.85-.91,2.24l1.78-1.28c-.26,.84-.73,1.34-1.53,1.61-.44,.15-.79,.53-1.12,.9,1.36,.33,2,.11,2.52-.87,.92-1.75,2.4-2.19,4.22-1.99-.06,1.73-1.39,2.88-3.24,3.23-2.41,.46-4.81,1.03-6.78,2.68-.98,.82-1.64,1.81-1.75,3.11-.25,3.13,.46,5.99,2.5,8.61,.11-.37,.21-.62,.27-.88,.34-1.6,1.14-2.91,2.39-3.98,.63-.54,1.21-1.16,1.73-1.8,.24-.29,.31-.73,.38-1.2-1.64,1.15-3.21,1.23-4.93-.04l1.89-1.41-1.75-2.32c1.44-.47,2.58-.36,3.56,.27,.55-.89,1.09-1.76,1.66-2.69,1.02,1.1,1.31,2.57,.54,3.53-.84,1.04-.21,1.58,.36,2.28,2.02-1.41,1.43-3.33,1.02-5.21l.25-.06,.9,1.74,.93-2.26,1.03,.8h0Zm16.18,88.52c9.88-8.15,15.39-22.99,9.99-37.57-5.6-15.1-20.41-24.35-36.33-22.43-15.64,1.89-27.94,14.36-29.93,30.18-.71,5.62,.06,11.05,2.13,16.3,2.04,5.18,7.26,12.3,9.75,13.32,0-.42,0-.8,0-1.18,0-6.25,.02-12.5,0-18.75,0-.75,.25-1.07,.95-1.28,1.94-.59,3.84-1.31,5.78-1.87,.79-.23,.97-.59,.95-1.35-.05-2.25,0-4.51-.03-6.76,0-.56,.15-.89,.66-1.14,1.18-.59,2.33-1.25,3.51-1.83,.5-.25,.69-.56,.68-1.12-.04-1.84,.02-3.67-.03-5.51-.02-.68,.19-1.02,.81-1.31,4.73-2.2,9.43-4.44,14.15-6.66,1.44-.68,2.89-1.33,4.41-2.04,.02,.36,.05,.58,.05,.8,0,3.12,.02,6.25-.02,9.37,0,.72,.23,1.1,.87,1.4,1.05,.5,2.04,1.11,3.08,1.61,.63,.3,.87,.7,.86,1.42-.05,2.35,0,4.7-.03,7.05,0,.63,.17,.9,.81,1.03,1.92,.39,3.82,.91,5.75,1.27,.91,.17,1.24,.48,1.23,1.47-.05,8.18-.02,16.36-.02,24.55,0,.28,0,.55,0,1.02Zm-17.2-28.25v36.16c.41-.06,.75-.09,1.1-.16,1.34-.24,1.34-.25,1.34-1.64,0-10.6,0-21.19,0-31.79,0-2.28-.01-2.28-2.3-2.6-.03,0-.06,.01-.13,.03Zm-9.98,36.19v-32.31c-.45,.14-.81,.3-1.18,.35-1,.15-1.29,.65-1.29,1.69,.05,9.14,.03,18.29,.03,27.43,0,.58-.04,1.17,.03,1.74,.03,.25,.27,.59,.49,.67,.6,.2,1.24,.28,1.92,.42Zm14.67-45.24c0,2.54,0,4.91,.02,7.28,0,.18,.24,.46,.41,.51,.66,.19,1.35,.3,2.13,.46,0-2.3,.01-4.45-.02-6.59,0-.2-.19-.49-.38-.59-.64-.36-1.31-.65-2.17-1.07Zm-21.9,12.89c.82-.25,1.47-.41,2.09-.65,.18-.07,.39-.35,.39-.54,.03-2.15,.02-4.3,.02-6.62-.85,.45-1.56,.8-2.25,1.2-.13,.08-.24,.31-.24,.48-.02,1.99-.01,3.98-.01,6.13Zm15.62-48.38c.16-.09,.27-.13,.35-.21,1.8-1.61,3.83-2.07,6.17-1.39,.76,.22,1.58,.21,2.38,.3-1.18-.51-2.37-.88-3.58-1.17-2.16-.52-4.67,.63-5.32,2.46ZM60,4.86c.55,1.68,1.93,2.6,3.5,2.37-.56-1.52-1.96-2.47-3.5-2.37Zm26.31,10.4c1.75-.29,2.65-1.28,2.62-2.78-1.6,.34-2.41,1.19-2.62,2.78Zm-28.87,6.67c-.45-1.69-1.55-2.6-2.95-2.44,.49,1.62,1.55,2.5,2.95,2.44ZM63.86,3.79c-.66,1.3,.13,3.17,1.57,3.69,.18-1.54-.36-2.74-1.57-3.69Zm36.84,14.48c1.52,0,2.79-.84,3.3-2.22-1.57-.11-2.91,.79-3.3,2.22Zm-29.95,14.45l.36,6.18c1.06-1.15,.84-4.83-.36-6.18Zm.54-26.65c-1.01,1.17-1.08,2.57-.26,3.57,.97-1.23,1.05-2.21,.26-3.57Zm-3.67,33.71c1.83-.6,2.29-3.88,.86-5.57,.29,1.97,.22,3.77-.86,5.57Zm29.64-28.69c-1.53,.42-2.31,1.32-2.35,2.75,1.44-.29,2.32-1.33,2.35-2.75Zm-58.86,4.72c-.03,1.59,.91,2.83,2.2,3.01-.22-1.63-.81-2.46-2.2-3.01ZM76.99,4.27c-1.47,.7-2.08,1.75-1.9,3.21,1.34-.52,2-1.61,1.9-3.21Zm-17.47,14.57c.88-1.24,.85-2.52-.03-3.51-.87,1.25-.87,2.1,.03,3.51ZM92.07,7.12c-1.44,.71-2,1.8-1.64,3.06,1.18-.66,1.77-1.61,1.64-3.06Zm-50.81,25.73c1.56,.05,2.47-.57,2.82-1.91-1.56,.05-2.4,.62-2.82,1.91Zm39.21,6.43c-.57-1.69-1.11-3.26-1.64-4.84-.21,1.45-.2,2.89,.69,4.17,.21,.3,.64,.46,.95,.67Zm-43.24-10.24c-1.4-.59-2.58-.3-3.39,.79,1.28,.53,2.36,.23,3.39-.79Zm30.41,1.4c-1.54-1.74-3.92-1.55-5.77-2.59,1.59,1.63,3.88,1.66,5.77,2.59Zm-9.73-18.34c.02-1.61-.62-2.57-1.92-2.93,.03,1.35,.64,2.28,1.92,2.93Zm-11.29,3.74c.54-1.26,.25-2.35-.83-3.16-.53,1.1-.21,2.34,.83,3.16Zm17.72-4.71c-.63-1.4-1.39-1.86-2.79-1.77,.46,1.25,1.29,1.79,2.79,1.77Zm-16.6,7.63c.44-1.43,1.42-2.49,.71-3.96-1.15,1.12-1.2,2.35-.71,3.96ZM73.65,3.03c-.56,1.41-.34,2.36,.66,3.06,.59-1.39,.43-2.2-.66-3.06Zm36.96,24.94c-.72-1.42-1.68-1.98-2.81-1.67,.64,1.02,1.38,1.82,2.81,1.67Zm-19.42-15.73c1.38-.65,1.97-1.58,1.78-2.71-1.37,.51-1.89,1.28-1.78,2.71Zm-51.65,15.16c.53,1.23,1.38,1.87,2.66,2.08-.49-1.52-1.21-2.09-2.66-2.08Zm-3.13-9.86c.2-1.3,.05-2.39-1.06-3.17-.42,1.33-.08,2.39,1.06,3.17Zm66.05-4.22c-1.19,.46-1.81,1.58-1.55,2.83,1.17-.79,1.6-1.57,1.55-2.83Zm-34.87-7.55c1.45-.06,2.35-.84,2.44-2.13-1.26,.2-2.03,.93-2.44,2.13Zm-23.62,9.87c.37,1.39,1.02,1.96,2.38,2.15-.21-1.24-.92-1.9-2.38-2.15Zm-8.54,6.1c-.79-1.07-1.8-1.39-3.03-.95,.68,1.04,1.79,1.39,3.03,.95ZM99.46,12.78c-1.28-.19-2.18,.25-2.87,1.25,1.18,.36,2.12-.04,2.87-1.25Zm-31.91,10.2c-.17,2.05,.32,3.9,1.83,5.53l-1.83-5.53Zm12.67-13.81c-1.6,.06-2.33,.58-2.58,1.75,1.23,.03,1.99-.6,2.58-1.75Zm-5.17,13.14c-1.29,.47-2.36,2.96-1.89,4.44,.6-1.41,1.28-3.02,1.89-4.44Zm34.22-1.14c1.29-.36,1.89-1.13,1.83-2.33-1.2,.37-1.71,1.02-1.83,2.33Zm-72.03,3.02c.86,.98,1.71,1.19,2.85,.71-.82-1-1.6-1.19-2.85-.71Zm66.71-6.36c1.26,.44,2.4,.03,2.79-.99-1.12-.2-2.05,.05-2.79,.99Zm-62.5-3.63c-.8,1.12-.84,2.01-.2,3.03,.8-.92,.88-1.81,.2-3.03Zm60.67,8.6c1.13-1.05,1.36-2.15,.62-2.84-.69,.83-1.06,1.72-.62,2.84Zm-2.71-.36c-1.09,.91-1.36,1.92-1.09,3.28,.93-.95,1.31-1.93,1.09-3.28Zm-26.4-7.53c.43,1.15,1.42,1.65,2.68,1.36-.61-1.04-1.53-1.4-2.68-1.36Zm-12.97,7.83c1.32-.31,1.91-1.05,1.89-2.34-1.11,.42-1.72,1.16-1.89,2.34Zm47.66-3.42c-1.36,.28-1.9,.81-2.13,1.99,1.19-.15,1.79-.69,2.13-1.99Zm-31.82-1.58c-1.55-.54-2.32-.38-2.96,.53,1.05,.41,1.98,.27,2.96-.53Zm-25.05-6.22c.65,1.17,1.69,1.61,2.7,1.2-.66-.94-1.5-1.41-2.7-1.2Zm58.44,10.62l.12,.37c1.44,.26,2.23-.03,2.64-1.26l-2.76,.89Zm-22.97-9.97c.99-1.04,1.15-1.76,.62-2.68-.74,.74-1.02,1.56-.62,2.68ZM67.46,3.27c1.27-.29,1.81-.96,1.85-2.25-1.07,.37-1.54,1.16-1.85,2.25Zm44.88,20.23l-.02-.37-2.68,.28,.03,.28c1.11,.6,1.77,.55,2.67-.19Zm-30.57-7.53c.26-.99,.26-1.87-.49-2.67-.59,1.22-.5,1.76,.49,2.67Zm-32.95,4.2c.86-1.12,.92-1.95,.23-2.73-.54,.84-.71,1.69-.23,2.73Zm61.9,5.1c1.06,.6,1.93,.7,2.93,.13-.95-.67-1.82-.72-2.93-.13Zm-65.39-3.26l.41-.18c-.09-.94-.36-1.77-1.31-2.23l-.31,.17,1.21,2.24Zm31.66-8.75c-.78,.81-.92,1.6-.54,2.66,.75-.81,.98-1.59,.54-2.66Zm13.79,9.28h.3c.64-1.05,.57-1.72-.46-2.52l.16,2.52Zm1.8,3.86c1.28,.78,2.61,1.5,4.15,1.17l-4.15-1.17Zm-58.31-8.43l-.11,.36c.61,.73,1.36,1.03,2.28,.77l.11-.3-2.28-.83ZM66.71,1.97l-.62-.1-.35,2.36,.54,.09,.42-2.34Zm38.29,25.21l-.16,.31c.46,.75,1.07,1.21,2,1.04l.16-.31-2-1.04ZM54.24,12.54l.3-.1c.07-1.1-.23-1.66-1.37-2.16l1.07,2.26Zm12.75-1.85c1.2-.35,1.52-.99,1.06-2.02l-1.06,2.02Zm18.54-2.55l-.46-.02c-.24,.72-.36,1.43,.21,2.08l.34-.02-.09-2.04Zm-17.9-4.09c-1.28,.51-1.63,1.17-1.31,2.4l1.31-2.4Z"/><path d="M88.24,109.79v-33.32c.46,.09,.85,.2,1.25,.25,.7,.09,.92,.42,.92,1.15-.03,6.02-.02,12.04-.02,18.06,0,3.86-.05,7.73,.03,11.59,.02,1.16-.29,1.82-1.43,2.04-.21,.04-.42,.13-.75,.24Z"/><path d="M63.67,81.14v28.66c-.69-.27-1.3-.46-1.85-.76-.21-.11-.39-.49-.39-.75-.01-8.59,0-17.18,.03-25.77,0-.28,.29-.66,.55-.8,.49-.26,1.07-.39,1.66-.59Z"/></g><g><path d="M125.54,137.77h-3.14v-9.97c-1.39,1.86-2.71,3.64-4.04,5.42-.54,.73-1.09,1.46-1.64,2.18-.61,.79-1.18,.79-1.8-.03-1.84-2.45-3.67-4.9-5.51-7.36-.05-.07-.12-.11-.25-.23v9.97h-2.84v-14.47c.89,0,1.77-.04,2.63,.02,.24,.02,.51,.29,.68,.52,2.12,2.65,4.23,5.31,6.41,8.06,.96-1.24,1.89-2.45,2.83-3.66,1-1.3,2.03-2.58,2.96-3.92,.52-.75,1.08-1.16,2.02-1.02,.53,.08,1.08,.01,1.69,.01v14.47Z"/><path d="M93.97,137.77c-1.97,0-3.95,.06-5.92-.02-2.08-.08-2.96-1.02-3-3.1-.04-2.73-.04-5.46,0-8.2,.02-1.98,.87-3.02,2.84-3.06,4.12-.1,8.25-.08,12.38,0,1.68,.04,2.58,.96,2.62,2.57,.08,3,.1,6.01,.02,9.01-.05,1.82-.92,2.66-2.75,2.74-2.06,.1-4.13,.02-6.19,.02v.02Zm-5.58-2.77h11.19c0-2.89,0-5.73-.03-8.57,0-.16-.37-.46-.57-.46-3.33-.02-6.67-.02-10,.02-.2,0-.56,.36-.57,.56-.04,2.79-.03,5.57-.03,8.46Z"/><path d="M16.31,126.78l-2.95,.62-.1-1.48H3.71c0,.88-.03,1.77,.04,2.66,.01,.14,.51,.33,.78,.33,2.22,.02,4.43,0,6.65,0,.88,0,1.76,.03,2.64,.11,1.7,.16,2.6,1.04,2.71,2.74,.07,1.12,.06,2.25,0,3.37-.09,1.64-.92,2.52-2.58,2.6-2.15,.1-4.31,.08-6.46,.09-1.52,0-3.04,.03-4.55-.06-2.04-.12-3.08-1.37-2.9-3.39,.02-.21,.23-.52,.4-.56,.88-.2,1.78-.32,2.75-.48l.11,1.67H13.38v-3.29c-.92,0-1.8,0-2.67,0-1.97,0-3.95,.01-5.92,0-.6,0-1.21-.06-1.81-.15-1.41-.23-2.13-.9-2.29-2.31-.12-1.08-.15-2.19-.05-3.27,.15-1.7,.98-2.51,2.71-2.61,1.69-.11,3.4-.08,5.1-.08,1.64,0,3.28-.02,4.92,.07,2.14,.12,3,1.13,2.95,3.43Z"/><path d="M51.48,133.13v-9.79h3.02v14.41c-1.24,.06-2.36,.24-3.46-.75-3.44-3.1-6.99-6.08-10.57-9.17v9.9h-3.03v-14.37c1.34-.14,2.51-.21,3.68,.86,3.29,3.01,6.72,5.86,10.1,8.77,.06,.05,.14,.08,.25,.13Z"/><path d="M143.69,123.35v2.45h-11.3v3.1h6.72v2.52c-1.98,0-3.92,.04-5.85-.02-.78-.02-1,.24-.95,.98,.06,.84,.01,1.69,.01,2.66h11.53v2.71h-14.86v-14.39h14.69Z"/><path d="M81.78,137.76h-3.33v-6.23h-10.53v6.18h-3.37v-14.36h3.32v5.42h10.56v-5.43h3.35v14.42Z"/><path d="M19.84,123.33h14.65v2.5h-11.27v3.08h6.71v2.49h-6.72v3.65h11.48v2.71h-14.86v-14.43Z"/><path d="M59.61,133.54q2.16,0,2.16,2.16c0,2.15-.01,2.17-2.18,2.16-2.26,0-2.28-.02-2.27-2.27,0-.18,0-.36,0-.54,.02-1.27,.22-1.49,1.46-1.51,.27,0,.54,0,.82,0Z"/></g></svg></div></div>
+          <p className="text-xs font-semibold tracking-widest uppercase mb-4" style={{color:'#C9A84C'}}>Votre Agence Immobilière Premium à Dakar</p>
+          <h1 className="font-display text-5xl md:text-6xl text-white font-bold mb-4 leading-tight">Trouvez votre<br/>appartement idéal</h1>
+          <p className="text-white/60 text-lg mb-10">Des biens d'exception dans les meilleurs quartiers de Dakar</p>
+          <div className="bg-white rounded-2xl p-4 shadow-2xl max-w-2xl mx-auto">
+            <div className="flex flex-col md:flex-row gap-3 items-end">
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 font-medium block mb-1 text-left">Zone géographique</label>
+                <select className="w-full text-gray-700 text-sm bg-transparent outline-none">
+                  {ZONES.map(z=><option key={z}>{z}</option>)}
+                </select>
+              </div>
+              <div className="hidden md:block w-px h-8 bg-gray-200 self-center"></div>
+              <div className="flex-1">
+                <label className="text-xs text-gray-400 font-medium block mb-1 text-left">Budget mensuel</label>
+                <select className="w-full text-gray-700 text-sm bg-transparent outline-none">
+                  {BUDGETS.map(b=><option key={b.label}>{b.label}</option>)}
+                </select>
+              </div>
+              <button onClick={()=>go('properties')} className="btn-gold flex items-center gap-2 whitespace-nowrap"><I n="search" s={15}/>Rechercher</button>
+            </div>
+          </div>
+          <div className="flex items-center justify-center gap-10 mt-10">
+            {[[apartments.length+'+','Biens disponibles'],['12','Quartiers couverts'],['200+','Clients satisfaits']].map(([v,l],i)=>(
+              <div key={i} className="text-center"><div className="font-display text-2xl font-bold text-white">{v}</div><div className="text-white/40 text-xs">{l}</div></div>
+            ))}
+          </div>
+        </div>
+        <div className="absolute bottom-8 left-1/2 -translate-x-1/2 text-white/30 animate-bounce"><I n="down" s={28}/></div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-16">
+        <div className="flex items-center justify-between mb-8">
+          <div>
+            <p className="text-xs font-semibold tracking-widest uppercase mb-1" style={{color:'#C9A84C'}}>Sélection</p>
+            <h2 className="font-display text-3xl text-gray-800">Biens en vedette</h2>
+          </div>
+          <button onClick={()=>go('properties')} className="flex items-center gap-2 text-sm border rounded-full px-5 py-2 font-medium transition-colors hover:bg-blue-50" style={{color:'#1E3A5F',borderColor:'#C9A84C'}}>
+            Voir tout <I n="right" s={14}/>
+          </button>
+        </div>
+        {featured.length > 0
+          ? <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">{featured.map(a=><AptCard key={a.id} apt={a} onClick={apt=>{pick(apt);go('property');}}/>)}</div>
+          : <div className="text-center py-16 text-gray-400"><I n="building" s={40} c="mx-auto mb-3"/><p>Ajoutez vos premiers biens dans Supabase</p></div>
+        }
+      </div>
+
+      <div style={{background:'#0A1628'}} className="py-16">
+        <div className="max-w-6xl mx-auto px-4">
+          <div className="text-center mb-10">
+            <p className="text-xs font-semibold tracking-widest uppercase mb-2" style={{color:'#C9A84C'}}>Quartiers</p>
+            <h2 className="font-display text-3xl text-white">Explorez par zone</h2>
+          </div>
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+            {['Almadies','Point E','Ngor','Sacré-Cœur','Plateau','Mermoz','Ouakam','Fann Résidence'].map(z=>(
+              <button key={z} onClick={()=>go('properties')} className="border border-white/10 rounded-xl py-4 text-center group hover:border-yellow-400 hover:bg-white/5 transition-all">
+                <I n="location" s={18} c="mx-auto mb-2 text-white/30 group-hover:text-yellow-400 transition-colors"/>
+                <span className="text-white/60 group-hover:text-white text-sm transition-colors">{z}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="py-16 px-4 text-center" style={{background:'#F8F6F0'}}>
+        <h2 className="font-display text-3xl text-gray-800 mb-3">Prêt à trouver votre appartement ?</h2>
+        <p className="text-gray-400 mb-8 max-w-sm mx-auto">Contactez-nous directement sur WhatsApp pour une réponse rapide</p>
+        <a href="https://wa.me/221770000000" target="_blank" className="inline-flex items-center gap-3 text-white px-8 py-4 rounded-full font-semibold text-base shadow-lg hover:opacity-90 transition-opacity" style={{background:'#25D366'}}>
+          <I n="wa" s={22}/>Nous contacter sur WhatsApp
+        </a>
+      </div>
+
+      <footer style={{background:'#0A1628'}} className="py-8 px-4">
+        <div className="max-w-6xl mx-auto flex flex-col md:flex-row items-center justify-between gap-2">
+          <span className="font-display text-xl font-bold" style={{color:'#1E3A5F'}}>Sen.Home</span>
+          <p className="text-white/25 text-sm">© 2026 Sen.Home — Agence immobilière premium à Dakar</p>
+        </div>
+      </footer>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   PROPERTIES PAGE
+───────────────────────────────────────── */
+const PropertiesPage = ({ go, pick, apartments }) => {
+  const [view, setView] = useState('grid');
+  const [fZone, setFZone] = useState('Toutes les zones');
+  const [fBudget, setFBudget] = useState(0);
+  const [fType, setFType] = useState('Tous');
+  const types = ['Tous','Studio','F2','F3','F4','Duplex','Penthouse'];
+
+  const list = apartments.filter(a => {
+    const b = BUDGETS[fBudget];
+    return (fZone==='Toutes les zones'||a.zone===fZone) && a.price>=b.min && a.price<=b.max && (fType==='Tous'||a.type===fType);
+  });
+  const open = apt => { pick(apt); go('property'); };
+
+  return (
+    <div className="min-h-screen pt-16" style={{background:'#F8F6F0'}}>
+      <div style={{background:'#C9A84C'}} className="py-10 px-4">
+        <div className="max-w-6xl mx-auto">
+          <button onClick={()=>go('home')} className="text-white/50 hover:text-white text-sm flex items-center gap-1 mb-4 transition-colors"><I n="left" s={14}/>Retour à l'accueil</button>
+          <h1 className="font-display text-3xl text-white">Nos Appartements</h1>
+          <p className="text-white/40 mt-1 text-sm">{list.length} bien{list.length>1?'s':''} trouvé{list.length>1?'s':''}</p>
+        </div>
+      </div>
+
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="bg-white rounded-2xl p-4 mb-6 shadow-sm flex flex-wrap gap-4 items-end">
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Zone</label>
+            <select value={fZone} onChange={e=>setFZone(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none">
+              {ZONES.map(z=><option key={z}>{z}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-1">Budget</label>
+            <select value={fBudget} onChange={e=>setFBudget(Number(e.target.value))} className="text-sm border border-gray-200 rounded-lg px-3 py-2 outline-none">
+              {BUDGETS.map((b,i)=><option key={b.label} value={i}>{b.label}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="text-xs text-gray-400 block mb-2">Type</label>
+            <div className="flex gap-2 flex-wrap">
+              {types.map(t=>(
+                <button key={t} onClick={()=>setFType(t)} className="text-xs px-3 py-1.5 rounded-full border transition-all"
+                  style={fType===t?{background:'#C9A84C',color:'white',borderColor:'#C9A84C'}:{borderColor:'#E5E7EB',color:'#6B7280'}}>{t}</button>
+              ))}
+            </div>
+          </div>
+          <div className="ml-auto flex items-center gap-1 bg-gray-100 rounded-xl p-1">
+            {[['grid','grid'],['list','list'],['map','map']].map(([v,icon])=>(
+              <button key={v} onClick={()=>setView(v)} className="p-2 rounded-lg transition-all" style={view===v?{background:'white',boxShadow:'0 1px 4px rgba(0,0,0,0.10)'}:{}}>
+                <I n={icon} s={18} c={view===v?'text-blue-900':'text-gray-400'}/>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {view==='grid' && <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 fade-in">{list.map(a=><AptCard key={a.id} apt={a} onClick={open}/>)}</div>}
+
+        {view==='list' && (
+          <div className="space-y-4 fade-in">
+            {list.map(a=>(
+              <div key={a.id} onClick={()=>open(a)} className="bg-white rounded-xl overflow-hidden shadow-sm flex cursor-pointer card-hover">
+                <img src={a.images[0]||'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=400&q=60'} alt={a.title} className="w-40 h-32 object-cover flex-shrink-0"/>
+                <div className="p-4 flex-1 flex items-center justify-between">
+                  <div>
+                    <h3 className="font-semibold text-gray-800">{a.title}</h3>
+                    <div className="flex items-center gap-1 text-gray-400 text-xs mt-1"><I n="location" s={11}/>{a.zone}</div>
+                    <div className="flex gap-3 text-gray-400 text-xs mt-2">
+                      <span className="flex items-center gap-1"><I n="bed" s={11}/>{a.bedrooms} ch.</span>
+                      <span className="flex items-center gap-1"><I n="bath" s={11}/>{a.bathrooms} sdb</span>
+                      <span className="flex items-center gap-1"><I n="expand" s={11}/>{a.surface}m²</span>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-bold" style={{color:'#1E3A5F'}}>{fmt(a.price)}<span className="text-gray-400 text-xs font-normal">/mois</span></div>
+                    <span className={`badge text-xs mt-2 ${a.available?'bg-green-100 text-green-700':'bg-red-100 text-red-600'}`}>{a.available?'● Disponible':'● Loué'}</span>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {view==='map' && (
+          <div className="fade-in">
+            <MapView apts={list} onSelect={apt=>{pick(apt);go('property');}}/>
+            <p className="text-center text-gray-400 text-xs mt-3">Cliquez sur un marqueur pour voir les détails</p>
+          </div>
+        )}
+
+        {list.length===0 && view!=='map' && (
+          <div className="text-center py-24"><I n="building" s={48} c="mx-auto text-gray-300 mb-4"/><p className="text-gray-400">Aucun bien ne correspond à vos critères</p></div>
+        )}
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   PROPERTY DETAIL PAGE
+───────────────────────────────────────── */
+const PropertyPage = ({ apt, go, addRequest }) => {
+  const [imgIdx, setImgIdx] = useState(0);
+  const [showTour, setShowTour] = useState(false);
+  const [done, setDone] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [form, setForm] = useState({name:'',phone:'',budget:'',date:'',profession:''});
+
+  useEffect(()=>{setImgIdx(0);setShowTour(false);setDone(false);setSending(false);},[apt]);
+  if (!apt) return null;
+
+  const submit = async (e) => {
+    e.preventDefault();
+    setSending(true);
+    const req = { apt_id: apt.id, apt_title: apt.title, ...form, id: Date.now(), status:'new', created: new Date().toISOString().slice(0,10) };
+    try {
+      const { error } = await sb.from('visit_requests').insert({
+        apartment_id: apt.id,
+        full_name: form.name,
+        phone: form.phone,
+        budget_label: form.budget,
+        visit_date: form.date || null,
+        profession: form.profession,
+      });
+      if (error) console.warn('Supabase insert error:', error.message);
+    } catch(err) {
+      console.warn('Could not save to Supabase, local only');
+    }
+    addRequest(req);
+    setDone(true);
+    setSending(false);
+  };
+
+  return (
+    <div className="min-h-screen pt-16 fade-in" style={{background:'#F8F6F0'}}>
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <button onClick={()=>go('properties')} className="text-gray-400 hover:text-gray-700 text-sm flex items-center gap-1 mb-6 transition-colors"><I n="left" s={14}/>Retour aux annonces</button>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+          <div className="lg:col-span-2">
+            <div className="relative rounded-2xl overflow-hidden bg-gray-200 mb-3">
+              <img src={apt.images[imgIdx]||apt.images[0]} alt={apt.title} className="w-full h-80 md:h-96 object-cover"/>
+              {apt.images.length>1 && <>
+                <button onClick={()=>setImgIdx((imgIdx-1+apt.images.length)%apt.images.length)} className="absolute left-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white w-10 h-10 rounded-full flex items-center justify-center shadow-md"><I n="left" s={16}/></button>
+                <button onClick={()=>setImgIdx((imgIdx+1)%apt.images.length)} className="absolute right-3 top-1/2 -translate-y-1/2 bg-white/90 hover:bg-white w-10 h-10 rounded-full flex items-center justify-center shadow-md"><I n="right" s={16}/></button>
+              </>}
+              <div className="absolute bottom-3 right-3 bg-black/50 text-white text-xs px-2 py-1 rounded-full">{imgIdx+1}/{apt.images.length}</div>
+            </div>
+
+            <div className="flex gap-2 mb-6 overflow-x-auto pb-1">
+              {apt.images.map((img,i)=>(
+                <img key={i} src={img} alt="" onClick={()=>setImgIdx(i)}
+                  className="w-20 h-14 object-cover rounded-lg flex-shrink-0 cursor-pointer transition-all"
+                  style={i===imgIdx?{outline:'2px solid #C9A84C'}:{opacity:0.55}}/>
+              ))}
+              {apt.tour && (
+                <button onClick={()=>setShowTour(!showTour)} className="w-20 h-14 rounded-lg flex-shrink-0 flex flex-col items-center justify-center text-xs font-medium gap-1 transition-all border-2"
+                  style={showTour?{background:'#C9A84C',color:'white',borderColor:'#C9A84C'}:{background:'#FEF9E7',color:'#1E3A5F',borderColor:'#F5DEB3'}}>
+                  <I n="tour" s={15}/>Visite 3D
+                </button>
+              )}
+            </div>
+
+            {showTour && apt.tour && (
+              <div className="mb-6 rounded-2xl overflow-hidden fade-in shadow-md">
+                <div style={{background:'#C9A84C'}} className="px-4 py-2.5 flex items-center justify-between">
+                  <span className="text-white text-sm font-medium flex items-center gap-2"><I n="tour" s={14}/>Visite Virtuelle 3D</span>
+                  <button onClick={()=>setShowTour(false)} className="text-white/50 hover:text-white"><I n="close" s={16}/></button>
+                </div>
+                <iframe src={apt.tour} width="100%" height="380" allow="xr-spatial-tracking" allowFullScreen className="block"></iframe>
+              </div>
+            )}
+
+            <div className="bg-white rounded-2xl p-6 mb-5 shadow-sm">
+              <div className="flex items-start justify-between mb-4">
+                <div>
+                  <h1 className="font-display text-2xl text-gray-800 font-semibold mb-1">{apt.title}</h1>
+                  <div className="flex items-center gap-1 text-gray-400 text-sm"><I n="location" s={14}/>{apt.zone}, Dakar</div>
+                </div>
+                <div className="text-right">
+                  <div className="font-display text-2xl font-bold" style={{color:'#1E3A5F'}}>{fmt(apt.price)}</div>
+                  <span className="text-gray-400 text-sm">/mois</span>
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-4 py-4 border-y border-gray-100 mb-4">
+                <div className="text-center"><I n="bed" s={20} c="mx-auto text-gray-400 mb-1"/><div className="font-semibold text-gray-700">{apt.bedrooms}</div><div className="text-xs text-gray-400">Chambre{apt.bedrooms>1?'s':''}</div></div>
+                <div className="text-center border-x border-gray-100"><I n="bath" s={20} c="mx-auto text-gray-400 mb-1"/><div className="font-semibold text-gray-700">{apt.bathrooms}</div><div className="text-xs text-gray-400">Salle de bain</div></div>
+                <div className="text-center"><I n="expand" s={20} c="mx-auto text-gray-400 mb-1"/><div className="font-semibold text-gray-700">{apt.surface}m²</div><div className="text-xs text-gray-400">Surface</div></div>
+              </div>
+              <p className="text-gray-600 leading-relaxed text-sm">{apt.description}</p>
+            </div>
+
+            <div className="bg-white rounded-2xl p-6 shadow-sm">
+              <h2 className="font-display text-xl text-gray-800 mb-4">Équipements & Services</h2>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {ALL_AMENITIES.map(am=>{
+                  const has=apt.amenities.includes(am);
+                  return (
+                    <div key={am} className={`flex items-center gap-2 text-sm ${has?'text-gray-700':'text-gray-300'}`}>
+                      <div className={`w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 ${has?'bg-green-100':'bg-gray-100'}`}><I n="check" s={11} c={has?'text-green-600':'text-gray-300'}/></div>
+                      {am}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {/* Booking form */}
+          <div>
+            <div className="bg-white rounded-2xl shadow-md sticky top-20 overflow-hidden">
+              <div style={{background:'#C9A84C'}} className="px-6 py-4">
+                <h2 className="font-display text-xl text-white">Demander une visite</h2>
+                <p className="text-white/40 text-xs mt-0.5">Réponse garantie sous 24h</p>
+              </div>
+              {done ? (
+                <div className="p-8 text-center fade-in">
+                  <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4"><I n="check" s={28} c="text-green-600"/></div>
+                  <h3 className="font-semibold text-gray-800 mb-2">Demande envoyée !</h3>
+                  <p className="text-gray-400 text-sm">Nous vous contacterons dans les 24h. Merci !</p>
+                  <button onClick={()=>setDone(false)} className="mt-5 text-blue-600 text-sm hover:underline">Faire une autre demande</button>
+                </div>
+              ) : (
+                <form onSubmit={submit} className="p-5 space-y-3.5">
+                  {[['name','text','Nom complet *','Ex: Mamadou Diallo',true],['phone','tel','WhatsApp *','+221 77 000 00 00',true],['profession','text','Profession','Ex: Ingénieur, Médecin...',false]].map(([k,t,label,ph,req])=>(
+                    <div key={k}>
+                      <label className="text-xs font-medium text-gray-500 block mb-1">{label}</label>
+                      <input required={req} type={t} placeholder={ph} value={form[k]} onChange={e=>setForm({...form,[k]:e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm"/>
+                    </div>
+                  ))}
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 block mb-1">Budget maximum *</label>
+                    <select required value={form.budget} onChange={e=>setForm({...form,budget:e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-600">
+                      <option value="">Sélectionner votre budget</option>
+                      {BUDGETS.slice(1).map(b=><option key={b.label} value={b.label}>{b.label}</option>)}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="text-xs font-medium text-gray-500 block mb-1">Date de visite souhaitée *</label>
+                    <select required value={form.date} onChange={e=>setForm({...form,date:e.target.value})} className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm text-gray-600">
+                      <option value="">Choisir un créneau disponible</option>
+                      {SLOTS.map(d=><option key={d} value={d}>{fmtDate(d)}</option>)}
+                    </select>
+                  </div>
+                  <button type="submit" disabled={sending} className="btn-gold w-full mt-1" style={sending?{opacity:0.7}:{}}>
+                    {sending ? 'Envoi en cours...' : 'Confirmer ma demande de visite'}
+                  </button>
+                  <p className="text-xs text-gray-300 text-center">Données traitées confidentiellement</p>
+                </form>
+              )}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   ADMIN LOGIN
+───────────────────────────────────────── */
+const AdminLogin = ({ go }) => {
+  const [email, setEmail] = useState('');
+  const [pwd, setPwd] = useState('');
+  const [err, setErr] = useState('');
+  const submit = e => {
+    e.preventDefault();
+    if (email==='admin@sen.home' && pwd==='senhome2026') go('admin-dashboard');
+    else setErr('Identifiants incorrects.');
+  };
+  return (
+    <div style={{background:'#0A1628'}} className="min-h-screen flex items-center justify-center px-4">
+      <div className="w-full max-w-sm fade-in">
+        <div className="text-center mb-8">
+          <span className="font-display text-3xl font-bold" style={{color:'#C9A84C'}}>Sen.Home</span>
+          <p className="text-white/30 text-sm mt-1">Espace administrateur</p>
+        </div>
+        <div className="bg-white rounded-2xl p-8 shadow-2xl">
+          <h1 className="font-display text-xl text-gray-800 mb-6">Connexion</h1>
+          <form onSubmit={submit} className="space-y-4">
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Email</label>
+              <input value={email} onChange={e=>setEmail(e.target.value)} type="email" placeholder="admin@sen.home" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm"/>
+            </div>
+            <div>
+              <label className="text-xs font-medium text-gray-500 block mb-1">Mot de passe</label>
+              <input value={pwd} onChange={e=>setPwd(e.target.value)} type="password" placeholder="••••••••" className="w-full border border-gray-200 rounded-xl px-4 py-3 text-sm"/>
+            </div>
+            {err && <p className="text-red-500 text-xs">{err}</p>}
+            <button type="submit" className="btn-primary w-full py-3">Se connecter</button>
+          </form>
+          <div className="mt-4 p-3 bg-gray-50 rounded-xl text-xs text-gray-400 text-center">Demo : <strong>admin@sen.home</strong> / <strong>senhome2026</strong></div>
+          <button onClick={()=>go('home')} className="block w-full text-center text-xs text-gray-300 mt-3 hover:underline">← Retour au site</button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   ADMIN DASHBOARD
+───────────────────────────────────────── */
+const AdminDashboard = ({ go, requests, apartments, dbLive, loadRequests }) => {
+  const newCount = requests.filter(r=>r.status==='new').length;
+  const avail = apartments.filter(a=>a.available).length;
+  const totalViews = apartments.reduce((s,a)=>s+(a.views||0),0);
+  const top = [...apartments].sort((a,b)=>(b.views||0)-(a.views||0)).slice(0,4);
+
+  return (
+    <div style={{background:'#F0F4F8'}} className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="font-display text-2xl text-gray-800">Tableau de bord</h1>
+          <button onClick={loadRequests} className="flex items-center gap-2 text-sm border border-gray-300 rounded-xl px-4 py-2 text-gray-500 hover:bg-gray-100 transition-colors">
+            <I n="refresh" s={14}/>Actualiser
+          </button>
+        </div>
+
+        {!dbLive && (
+          <div className="bg-yellow-50 border border-yellow-200 rounded-2xl p-4 mb-6 flex items-start gap-3">
+            <I n="db" s={18} c="text-yellow-600 flex-shrink-0 mt-0.5"/>
+            <div>
+              <p className="font-semibold text-yellow-800 text-sm">Données de démonstration</p>
+              <p className="text-yellow-700 text-xs mt-0.5">Les biens affichés sont fictifs. Ajoutez vos vrais appartements dans <strong>Supabase → Table Editor → apartments</strong>.</p>
+            </div>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+          {[
+            {label:'Total biens',val:apartments.length,icon:'building',color:'#1E3A5F'},
+            {label:'Disponibles',val:avail,icon:'check',color:'#16A34A'},
+            {label:'Vues totales',val:totalViews.toLocaleString('fr'),icon:'eye',color:'#7C3AED'},
+            {label:'Nouvelles demandes',val:newCount,icon:'calendar',color:'#C9A84C'},
+          ].map(s=>(
+            <div key={s.label} className="bg-white rounded-2xl p-5 shadow-sm">
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-xs text-gray-400 font-medium">{s.label}</span>
+                <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{background:s.color+'18'}}>
+                  <I n={s.icon} s={15}/>
+                </div>
+              </div>
+              <div className="font-display text-3xl font-bold text-gray-800">{s.val}</div>
+            </div>
+          ))}
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-700">Biens les plus consultés</h2>
+              <button onClick={()=>go('admin-properties')} className="text-xs text-blue-600 hover:underline">Voir tout</button>
+            </div>
+            <div className="space-y-3">
+              {top.map((a,i)=>(
+                <div key={a.id} className="flex items-center gap-3">
+                  <span className="text-gray-300 text-sm w-4 font-mono">{i+1}</span>
+                  <img src={a.images[0]||'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&q=60'} alt="" className="w-10 h-10 rounded-lg object-cover"/>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-700 truncate">{a.title}</p><p className="text-xs text-gray-400">{a.zone}</p></div>
+                  <span className="flex items-center gap-1 text-gray-400 text-sm"><I n="eye" s={13}/>{a.views}</span>
+                </div>
+              ))}
+              {top.length===0 && <p className="text-gray-400 text-sm text-center py-4">Aucun bien disponible</p>}
+            </div>
+          </div>
+
+          <div className="bg-white rounded-2xl p-6 shadow-sm">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="font-semibold text-gray-700">Dernières demandes</h2>
+              <button onClick={()=>go('admin-requests')} className="text-xs text-blue-600 hover:underline">Voir tout</button>
+            </div>
+            <div className="space-y-3">
+              {requests.slice(0,4).map(r=>(
+                <div key={r.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                  <div className="w-9 h-9 rounded-full flex items-center justify-center text-white font-semibold text-sm flex-shrink-0" style={{background:'#C9A84C'}}>{(r.name||'?').charAt(0)}</div>
+                  <div className="flex-1 min-w-0"><p className="text-sm font-medium text-gray-700 truncate">{r.name}</p><p className="text-xs text-gray-400 truncate">{r.apt_title}</p></div>
+                  <div className="flex flex-col items-end gap-1">
+                    <a href={`tel:${r.phone}`} className="btn-primary text-xs px-2.5 py-1 rounded-lg flex items-center gap-1"><I n="phone" s={11}/>Appeler</a>
+                    <span className={`badge text-xs ${r.status==='new'?'bg-yellow-100 text-yellow-700':r.status==='contacted'?'bg-blue-100 text-blue-700':'bg-green-100 text-green-700'}`}>
+                      {r.status==='new'?'Nouveau':r.status==='contacted'?'Contacté':'Visité'}
+                    </span>
+                  </div>
+                </div>
+              ))}
+              {requests.length===0 && <p className="text-gray-400 text-sm text-center py-4">Aucune demande pour l'instant</p>}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   ADMIN PROPERTIES
+───────────────────────────────────────── */
+const AdminProperties = ({ apartments, setApartments }) => {
+  const toggle = async (id, current) => {
+    const newVal = !current;
+    setApartments(prev => prev.map(a=>a.id===id?{...a,available:newVal}:a));
+    try { await sb.from('apartments').update({available:newVal}).eq('id',id); } catch {}
+  };
+  return (
+    <div style={{background:'#F0F4F8'}} className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-6">
+          <h1 className="font-display text-2xl text-gray-800">Gestion des Biens</h1>
+          <a href="https://supabase.com/dashboard/project/usnfmbnfailkhnpsmnqg/editor" target="_blank"
+            className="btn-gold flex items-center gap-2 text-sm"><I n="plus" s={15}/>Ajouter (Supabase)</a>
+        </div>
+        <div className="bg-white rounded-2xl shadow-sm overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <thead>
+                <tr style={{background:'#F8F8F6'}} className="text-left">
+                  {['Bien','Zone','Prix/mois','Vues','Statut','Actions'].map(h=>(
+                    <th key={h} className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {apartments.map(a=>(
+                  <tr key={a.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3">
+                        <img src={a.images[0]||'https://images.unsplash.com/photo-1560448204-e02f11c3d0e2?w=80&q=60'} alt="" className="w-12 h-9 object-cover rounded-lg"/>
+                        <div><div className="font-medium text-gray-800">{a.title}</div><div className="text-xs text-gray-400">{a.type} · {a.surface}m²</div></div>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3 text-gray-500">{a.zone}</td>
+                    <td className="px-4 py-3 font-semibold" style={{color:'#1E3A5F'}}>{fmt(a.price)}</td>
+                    <td className="px-4 py-3"><span className="flex items-center gap-1 text-gray-500"><I n="eye" s={13}/>{a.views}</span></td>
+                    <td className="px-4 py-3">
+                      <button onClick={()=>toggle(a.id,a.available)} className={`badge cursor-pointer text-xs transition-colors ${a.available?'bg-green-100 text-green-700':'bg-red-100 text-red-500'}`}>
+                        {a.available?'● Disponible':'● Loué'}
+                      </button>
+                    </td>
+                    <td className="px-4 py-3">
+                      <a href={`https://supabase.com/dashboard/project/usnfmbnfailkhnpsmnqg/editor`} target="_blank" className="p-1.5 rounded-lg hover:bg-blue-50 text-blue-500 transition-colors inline-block"><I n="edit" s={14}/></a>
+                    </td>
+                  </tr>
+                ))}
+                {apartments.length===0 && <tr><td colSpan="6" className="px-4 py-12 text-center text-gray-400">Aucun bien. Ajoutez-en depuis Supabase.</td></tr>}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   ADMIN REQUESTS
+───────────────────────────────────────── */
+const AdminRequests = ({ requests, updateStatus, loadRequests }) => {
+  const sc = { new:{label:'Nouveau',bg:'bg-yellow-100',text:'text-yellow-700'}, contacted:{label:'Contacté',bg:'bg-blue-100',text:'text-blue-700'}, visited:{label:'Visité',bg:'bg-green-100',text:'text-green-700'} };
+
+  return (
+    <div style={{background:'#F0F4F8'}} className="min-h-screen">
+      <div className="max-w-6xl mx-auto px-4 py-8">
+        <div className="flex items-center justify-between mb-2">
+          <h1 className="font-display text-2xl text-gray-800">Demandes de Visites</h1>
+          <button onClick={loadRequests} className="flex items-center gap-2 text-sm border border-gray-300 rounded-xl px-4 py-2 text-gray-500 hover:bg-gray-100 transition-colors"><I n="refresh" s={14}/>Actualiser</button>
+        </div>
+        <p className="text-gray-400 text-sm mb-6">{requests.filter(r=>r.status==='new').length} nouvelle(s) demande(s)</p>
+
+        {requests.length===0 && <div className="bg-white rounded-2xl p-16 text-center shadow-sm"><I n="calendar" s={40} c="mx-auto text-gray-300 mb-3"/><p className="text-gray-400">Aucune demande de visite pour l'instant</p></div>}
+
+        <div className="space-y-4">
+          {requests.map(r=>{
+            const s = sc[r.status] || sc.new;
+            return (
+              <div key={r.id} className="bg-white rounded-2xl p-5 shadow-sm fade-in">
+                <div className="flex flex-col md:flex-row gap-4 md:items-center">
+                  <div className="flex items-center gap-3 flex-1 min-w-0">
+                    <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0" style={{background:'#C9A84C'}}>{(r.name||'?').charAt(0)}</div>
+                    <div><h3 className="font-semibold text-gray-800">{r.name}</h3>{r.profession&&<p className="text-xs text-gray-400">{r.profession}</p>}</div>
+                  </div>
+                  <div className="flex-1 min-w-0"><p className="text-xs text-gray-400 mb-0.5">Bien souhaité</p><p className="text-sm font-medium text-gray-700 truncate">{r.apt_title}</p></div>
+                  <div className="flex-none"><p className="text-xs text-gray-400 mb-0.5">Budget max</p><p className="text-sm font-medium text-gray-700">{r.budget||'—'}</p></div>
+                  <div className="flex-none"><p className="text-xs text-gray-400 mb-0.5">Date souhaitée</p><p className="text-sm text-gray-700 flex items-center gap-1"><I n="calendar" s={12}/>{r.date?fmtDate(r.date):'—'}</p></div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <select value={r.status} onChange={e=>updateStatus(r.id,e.target.value)} className={`text-xs px-2.5 py-1.5 rounded-lg border-0 outline-none cursor-pointer ${s.bg} ${s.text}`}>
+                      <option value="new">Nouveau</option>
+                      <option value="contacted">Contacté</option>
+                      <option value="visited">Visité</option>
+                    </select>
+                    <a href={`https://wa.me/${(r.phone||'').replace(/\s+/g,'')}`} target="_blank" className="btn-green flex items-center gap-1.5"><I n="wa" s={13}/>WA</a>
+                    <a href={`tel:${r.phone}`} className="btn-primary text-xs px-3 py-2 flex items-center gap-1.5 rounded-lg"><I n="phone" s={13}/>Appeler</a>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
+  );
+};
+
+/* ─────────────────────────────────────────
+   APP ROOT
+───────────────────────────────────────── */
+const App = () => {
+  const [page, setPage] = useState('home');
+  const [apt, setApt] = useState(null);
+  const [apartments, setApartments] = useState([]);
+  const [requests, setRequests] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [dbLive, setDbLive] = useState(false);
+
+  /* ── Load apartments from Supabase ── */
+  const loadApartments = async () => {
+    try {
+      const { data, error } = await sb
+        .from('apartments')
+        .select(`*, zones(name), apartment_images(url, display_order), apartment_amenities(amenity)`)
+        .order('featured', { ascending: false })
+        .order('views',    { ascending: false });
+      if (error) throw error;
+      if (data && data.length > 0) {
+        setApartments(data.map(transformApt));
+        setDbLive(true);
+      } else {
+        // Table exists but empty → use static demo
+        setApartments(STATIC_APTS);
+        setDbLive(false);
+      }
+    } catch (e) {
+      console.warn('Supabase error, using static data:', e.message);
+      setApartments(STATIC_APTS);
+      setDbLive(false);
+    }
+  };
+
+  /* ── Load requests from Supabase ── */
+  const loadRequests = async () => {
+    try {
+      const { data, error } = await sb
+        .from('visit_requests')
+        .select(`*, apartments(title)`)
+        .order('created_at', { ascending: false });
+      if (!error && data && data.length > 0) {
+        setRequests(data.map(transformReq));
+      } else if (!error && data && data.length === 0) {
+        setRequests(STATIC_REQUESTS);
+      }
+    } catch {
+      setRequests(STATIC_REQUESTS);
+    }
+  };
+
+  useEffect(() => {
+    Promise.all([loadApartments(), loadRequests()]).finally(() => setLoading(false));
+  }, []);
+
+  /* ── Add request (local + Supabase via PropertyPage) ── */
+  const addRequest = (req) => setRequests(prev => [req, ...prev]);
+
+  /* ── Update request status ── */
+  const updateStatus = async (id, status) => {
+    setRequests(prev => prev.map(r => r.id===id ? {...r,status} : r));
+    try { await sb.from('visit_requests').update({status}).eq('id', id); } catch {}
+  };
+
+  const go = (p) => {
+    setPage(p);
+    if (!p.startsWith('admin')) window.scrollTo({top:0,behavior:'smooth'});
+  };
+
+  /* ── Loading screen ── */
+  if (loading) return (
+    <div style={{minHeight:'100vh',background:'#0A1628',display:'flex',alignItems:'center',justifyContent:'center'}}>
+      <div style={{textAlign:'center'}}>
+        <div className="font-display text-4xl font-bold mb-2" style={{color:'#1E3A5F'}}>Sen.Home</div>
+        <p style={{color:'rgba(255,255,255,0.35)',fontSize:'14px'}}>Chargement en cours...</p>
+        <div className="spinner"></div>
+      </div>
+    </div>
+  );
+
+  const renderPage = () => {
+    switch(page) {
+      case 'home':             return <HomePage go={go} pick={setApt} apartments={apartments}/>;
+      case 'properties':       return <PropertiesPage go={go} pick={setApt} apartments={apartments}/>;
+      case 'property':         return <PropertyPage apt={apt} go={go} addRequest={addRequest}/>;
+      case 'admin-login':      return <AdminLogin go={go}/>;
+      case 'admin-dashboard':  return <AdminDashboard go={go} requests={requests} apartments={apartments} dbLive={dbLive} loadRequests={loadRequests}/>;
+      case 'admin-properties': return <AdminProperties apartments={apartments} setApartments={setApartments}/>;
+      case 'admin-requests':   return <AdminRequests requests={requests} updateStatus={updateStatus} loadRequests={loadRequests}/>;
+      default:                 return <HomePage go={go} pick={setApt} apartments={apartments}/>;
+    }
+  };
+
+  return (
+    <div>
+      {page !== 'admin-login' && <Navbar page={page} go={go} dbLive={dbLive}/>}
+      <div key={page} className="fade-in">{renderPage()}</div>
+    </div>
+  );
+};
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+</script>
+</body>
+</html>
